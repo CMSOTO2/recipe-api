@@ -29,7 +29,7 @@ var client *mongo.Client
 var recipesCollection *mongo.Collection
 
 func init() {
-	mongoURI := "mongodb://localhost:27017"
+	mongoURI := "mongodb+srv://carlosmsoto2:carlos123@recipes.efzgczq.mongodb.net/"
 	clientOptions := options.Client().ApplyURI(mongoURI)
 	client, err := mongo.Connect(context.Background(), clientOptions)
 	if err != nil {
