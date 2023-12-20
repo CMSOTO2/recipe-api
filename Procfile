@@ -1,1 +1,0 @@
-web: ./recipe-api
