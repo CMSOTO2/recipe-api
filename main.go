@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
@@ -43,7 +44,13 @@ func main() {
 	r.GET("/recipes", getAllRecipes)
 	r.GET("/recipe/:id", getSingleRecipe)
 
-	r.Run()
+	port := os.Getenv("PORT")
+
+	if port == "" {
+		port = "8080"
+	}
+
+	r.Run("0.0.0.0:" + port)
 }
 
 func connectToMongoDB() error {
