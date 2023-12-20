@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -40,6 +41,9 @@ func init() {
 }
 
 func main() {
+	if err := godotenv.Load(".env"); err != nil {
+		log.Fatal("loading environment variables:", err)
+	}
 	r := gin.Default()
 	r.GET("/recipes", getAllRecipes)
 	r.GET("/recipe/:id", getSingleRecipe)
