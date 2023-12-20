@@ -2,17 +2,20 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"time"
 
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+type Collection struct {
+	ID      string   `json:"_id"`
+	Recipes []Recipe `json:"recipes"`
+}
 type Recipe struct {
 	ID          string   `json:"id"`
 	Name        string   `json:"name"`
@@ -25,76 +28,65 @@ type Recipe struct {
 	Ingredients []string `json:"ingredients"`
 }
 
-var client *mongo.Client
-var recipesCollection *mongo.Collection
+var mongoClient *mongo.Client
+
+const mongoURI = "mongodb+srv://carlosmsoto2:carlos123@recipes.efzgczq.mongodb.net/?retryWrites=true&w=majority"
 
 func init() {
-	mongoURI := "mongodb+srv://carlosmsoto2:carlos123@recipes.efzgczq.mongodb.net/"
-	clientOptions := options.Client().ApplyURI(mongoURI)
-	client, err := mongo.Connect(context.Background(), clientOptions)
-	if err != nil {
-		log.Fatal(err)
+	if err := connectToMongoDB(); err != nil {
+		log.Fatal("Could not connect to MongoDB")
 	}
-	err = client.Ping(context.Background(), nil)
-	if err != nil {
-		log.Fatal("Could not connect to MongoDB:", err)
-	}
-
-	recipesCollection = client.Database("recipe-web-app").Collection("recipes")
 }
 
 func main() {
-	router := gin.Default()
+	r := gin.Default()
+	r.GET("/recipes", getAllRecipes)
+	r.GET("/recipe/:id", getSingleRecipe)
 
-	router.GET("/recipes", getRecipesHandler)
-	router.POST("/recipes", createRecipeHandler)
-
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
-	address := fmt.Sprintf(":%s", port)
-	log.Printf("Server is running on %s...", address)
-	log.Fatal(http.ListenAndServe(address, router))
+	r.Run()
 }
 
-func getRecipesHandler(c *gin.Context) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	cursor, err := recipesCollection.Find(ctx, nil)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch recipes"})
-		return
+func connectToMongoDB() error {
+	serverAPI := options.ServerAPI(options.ServerAPIVersion1)
+	opts := options.Client().ApplyURI(mongoURI).SetServerAPIOptions(serverAPI)
+	client, err := mongo.Connect(context.TODO(), opts)
+	if err == nil {
+		mongoClient = client
+		return nil
 	}
 
-	defer cursor.Close(ctx)
+	return err
+}
 
-	var recipes []Recipe
-	if err := cursor.All(ctx, &recipes); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode recipes"})
-		return
+func getAllRecipes(c *gin.Context) {
+	cursor, err := mongoClient.Database("recipe-web-app").Collection("recipes").Find(context.TODO(), bson.D{{}})
+	if err != nil {
+		log.Fatal(err)
+	}
+	var recipes []bson.M
+	if err = cursor.All(context.TODO(), &recipes); err != nil {
+		log.Fatal(err)
 	}
 
 	c.JSON(http.StatusOK, recipes)
 }
 
-func createRecipeHandler(c *gin.Context) {
-	var recipe Recipe
-	if err := c.BindJSON(&recipe); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
-		return
-	}
+func getSingleRecipe(c *gin.Context) {
+	id := c.Param("id")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	objectId, err := primitive.ObjectIDFromHex(id)
 
-	result, err := recipesCollection.InsertOne(ctx, recipe)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to insert recipe"})
+		c.AbortWithStatus(400)
+		return
+	}
+	var recipe bson.M
+
+	err = mongoClient.Database("recipe-web-app").Collection("recipes").FindOne(context.TODO(), bson.D{{"_id", objectId}}).Decode(&recipe)
+	if err != nil {
+		c.AbortWithStatus(404)
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"id": result.InsertedID})
+	c.JSON(http.StatusOK, recipe)
 }
