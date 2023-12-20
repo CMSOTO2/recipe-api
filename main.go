@@ -50,7 +50,7 @@ func main() {
 		port = "8080"
 	}
 
-	r.Run(":" + port)
+	http.ListenAndServe(":"+port, r)
 }
 
 func connectToMongoDB() error {
