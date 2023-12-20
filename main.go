@@ -54,7 +54,7 @@ func main() {
 		port = "8080"
 	}
 
-	log.Fatal(http.ListenAndServe(":"+port, r.Handler()))
+	log.Fatal(http.ListenAndServe("0.0.0.0:"+port, r.Handler()))
 }
 
 func connectToMongoDB() error {
